@@ -90,7 +90,7 @@ identical results.
 | `src/tayori/kotoba.clj` | wire `DatomicStore` to a kotoba-server pod (kotobase.net XRPC) |
 | `src/tayori/query.cljc` | pure status lookups (`draft-status`/`sent?`/`revision-status`/`published?`) for callers that don't want to run the actor |
 | `src/tayori/sim.cljc` | demo driver |
-| `test/tayori/*_test.clj` | propose-only contract · store parity (Mem≡Datomic) · CACAO — **21 tests / 77 assertions** |
+| `test/tayori/*_test.clj` | propose-only contract · store parity (Mem≡Datomic) · CACAO — **28 tests / 99 assertions** |
 
 ## Channel / DocTarget → real backend (injection)
 
@@ -139,7 +139,7 @@ schema extension) is tracked as a separate follow-up — out of scope here.
 
 ## Status
 
-Scaffold + runnable. **21 tests / 77 assertions / 0 failures**, lint clean.
+Scaffold + runnable. **28 tests / 99 assertions / 0 failures**, lint clean.
 Store is `:db-api` driven — `MemStore ≡ DatomicStore(langchain.db) ≡
 kotoba-store(kotobase.net)` on the same contract. CACAO self-issuance is
 offline-verified. Real Channel/DocTarget bindings (Gmail/Slack/WhatsApp/

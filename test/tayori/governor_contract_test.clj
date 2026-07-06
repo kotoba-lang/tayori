@@ -120,6 +120,77 @@
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:tenant-mismatch} (-> (store/ledger s) last :basis))))))
 
+(deftest missing-thread-is-held
+  (testing "the governor never trusts a proposal's confidence alone for subject existence"
+    (let [[s actor] (fresh)
+          res (run actor "mt" {:op :reply/draft :thread "t-ghost"} 3)]
+      (is (not= :interrupted (:status res)))
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:no-thread} (-> (store/ledger s) last :basis))))))
+
+(deftest send-against-missing-thread-is-held
+  (let [[s actor] (fresh)
+        res (run actor "ms" {:op :reply/send :thread "t-ghost"} 3)]
+    (is (not= :interrupted (:status res)))
+    (is (= :hold (get-in res [:state :disposition])))
+    (is (some #{:no-thread} (-> (store/ledger s) last :basis)))))
+
+(deftest missing-document-is-held
+  (let [[s actor] (fresh)
+        res (run actor "md" {:op :document/revise :document "d-ghost"} 3)]
+    (is (not= :interrupted (:status res)))
+    (is (= :hold (get-in res [:state :disposition])))
+    (is (some #{:no-document} (-> (store/ledger s) last :basis)))))
+
+(deftest publish-against-missing-document-is-held
+  (let [[s actor] (fresh)
+        res (run actor "mp" {:op :document/publish :document "d-ghost" :target "x"} 3)]
+    (is (not= :interrupted (:status res)))
+    (is (= :hold (get-in res [:state :disposition])))
+    (is (some #{:no-document} (-> (store/ledger s) last :basis)))))
+
+(deftest consent-blocked-participant-not-first-is-held
+  (testing "a blocked contact anywhere in :participants holds sending, not only when listed first"
+    (let [[s actor] (fresh)]
+      (run actor "mc-c1" {:op :contact/register :contact "c-ok2"
+                          :value {:id "c-ok2" :channel :email :address "ok2@example.com"
+                                  :consent :known :first-contact? false}} 3)
+      (run actor "mc-t1" {:op :thread/register :thread "t-multi"
+                          :value {:id "t-multi" :channel :email :external-id "gm-multi"
+                                  :participants ["c-ok2" "c-blocked"] :tenant "alice" :status :open}} 3)
+      (run actor "mc-d" {:op :reply/draft :thread "t-multi"} 3)
+      (let [res (run actor "mc-s" {:op :reply/send :thread "t-multi"} 3)]
+        (is (not= :interrupted (:status res)))
+        (is (= :hold (get-in res [:state :disposition])))
+        (is (some #{:consent-blocked} (-> (store/ledger s) last :basis)))))))
+
+(deftest unrecognized-op-is-held
+  (testing "fail-closed: an op the governor doesn't recognize is a hard violation, not a silent pass"
+    (let [[s actor] (fresh)
+          res (run actor "uo" {:op :reply/teleport :thread "t-status"} 3)]
+      (is (not= :interrupted (:status res)))
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:unrecognized-op} (-> (store/ledger s) last :basis))))))
+
+(deftest a-throwing-channel-leaves-no-false-sent-status
+  (testing "the external effect runs BEFORE the store is mutated — a throw leaves no false :sent claim"
+    (let [s  (store/seed-db)
+          bad-ch (reify channel/Channel
+                   (fetch-thread [_ thread-id] {:id thread-id})
+                   (list-new-messages [_ _thread-id] [])
+                   (send-reply! [_ _thread _body] (throw (ex-info "smtp down" {}))))
+          actor (op/build s {:channel bad-ch})]
+      (run actor "d5" {:op :reply/draft :thread "t-status"} 3)
+      (let [r1 (run actor "s5" {:op :reply/send :thread "t-status"} 3)]
+        (is (= :interrupted (:status r1)))
+        (is (thrown? Exception
+                     (g/run* actor {:approval {:status :approved :by "alice"}}
+                             {:thread-id "s5" :resume? true}))))
+      (is (= "proposed" (name (:status (store/draft-of s "t-status"))))
+          "the draft must NOT have been flipped to :sent")
+      (is (empty? (filter #(and (= :committed (:t %)) (= :reply/send (:op %))) (store/ledger s)))
+          "no :committed ledger fact for the :reply/send that never actually happened"))))
+
 (deftest reject-signoff-holds
   (testing "a human rejection records a hold, not a send"
     (let [[_s actor sent] (fresh)

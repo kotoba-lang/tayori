@@ -17,24 +17,40 @@
 
   HARD invariants:
     :reply/draft :document/revise
-      1. No-actuation — proposal :effect must be :draft/:revision (a
+      1. Subject exists — the thread/document must already be a registered
+                          ground fact (an LLM can hallucinate an id; the
+                          governor never trusts confidence alone for this).
+      2. No-actuation — proposal :effect must be :draft/:revision (a
                          control-plane record), never :sent/:published.
-      2. Redaction    — every protected-tag cite (:health/:legal/:financial)
+      3. Redaction    — every protected-tag cite (:health/:legal/:financial)
                          must appear in :redactions.
     :reply/send
-      1. Consent      — the thread's contact must not be :consent :blocked.
+      1. Subject exists — the thread must already be registered.
+      2. Consent      — EVERY participant on the thread must not be
+                         :consent :blocked (not just the first).
     :document/publish
-      1. Tenant-isolation — the publish `target` must equal the document's own
+      1. Subject exists — the document must already be registered.
+      2. Tenant-isolation — the publish `target` must equal the document's own
                              registered `:path` (no cross-document hijack).
+    (any op) — an unrecognized :op is itself a hard violation (fail-closed:
+               a not-yet-wired op must never silently pass as clean).
   SOFT:
-    3. Confidence floor → escalate.
-    4. `:reply/send` and `:document/publish` are high-stakes → ALWAYS human."
+    Confidence floor → escalate.
+    `:reply/send` and `:document/publish` are high-stakes → ALWAYS human."
   (:require [tayori.policy :as policy]
             [tayori.store :as store]))
 
 (def confidence-floor 0.6)
 
 ;; ───────────────────────── invariant checks ─────────────────────────
+
+(defn- missing-thread-violations [st thread-id]
+  (when (nil? (store/thread st thread-id))
+    [{:rule :no-thread :detail (str "未登録スレッド: " thread-id)}]))
+
+(defn- missing-document-violations [st document-id]
+  (when (nil? (store/document st document-id))
+    [{:rule :no-document :detail (str "未登録文書: " document-id)}]))
 
 (defn- actuation-violations [proposal expected]
   (when (not= expected (:effect proposal))
@@ -47,11 +63,16 @@
     (when (seq missing)
       [{:rule :missing-redaction :detail (str "機微引用に redaction 無し: " missing)}])))
 
-(defn- consent-violations [st thread-id]
-  (let [th (store/thread st thread-id)
-        c  (store/contact st (first (:participants th)))]
-    (when (policy/consent-blocked? c)
-      [{:rule :consent-blocked :detail (str (:id c) " は送信ブロック対象")}])))
+(defn- consent-violations
+  "Every participant on the thread, not just the first — a blocked contact
+  anywhere on the thread must hold sending, not only when listed first."
+  [st thread-id]
+  (let [th       (store/thread st thread-id)
+        blocked  (->> (:participants th)
+                      (map #(store/contact st %))
+                      (filter policy/consent-blocked?))]
+    (mapv (fn [c] {:rule :consent-blocked :detail (str (:id c) " は送信ブロック対象")})
+          blocked)))
 
 (defn- tenant-violations [st document-id target]
   (let [doc (store/document st document-id)]
@@ -69,16 +90,20 @@
   (let [op   (:op request)
         hard (vec (case op
                     :reply/draft
-                    (concat (actuation-violations proposal :draft)
+                    (concat (missing-thread-violations st (:thread request))
+                            (actuation-violations proposal :draft)
                             (redaction-violations proposal))
                     :document/revise
-                    (concat (actuation-violations proposal :revision)
+                    (concat (missing-document-violations st (:document request))
+                            (actuation-violations proposal :revision)
                             (redaction-violations proposal))
                     :reply/send
-                    (consent-violations st (:thread request))
+                    (concat (missing-thread-violations st (:thread request))
+                            (consent-violations st (:thread request)))
                     :document/publish
-                    (tenant-violations st (:document request) (:target request))
-                    []))
+                    (concat (missing-document-violations st (:document request))
+                            (tenant-violations st (:document request) (:target request)))
+                    [{:rule :unrecognized-op :detail (str "未対応 op: " op)}]))
         conf    (:confidence proposal 0.0)
         low?    (< conf confidence-floor)
         stakes? (contains? #{:reply/send :document/publish} op)

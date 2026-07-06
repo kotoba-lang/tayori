@@ -30,8 +30,15 @@
   (reify ch/Channel
     (fetch-thread [_ thread-id]
       (some-> (gmail-get http-fn creds thread-id) :body json-read))
-    (list-new-messages [_ thread-id]
-      (:messages (some-> (gmail-get http-fn creds thread-id) :body json-read)))
+    (list-new-messages [_ _thread-id]
+      ;; Gmail's threads.get has no "since" filter — correctly filtering to
+      ;; only-new messages needs users.history.list against a stored
+      ;; historyId cursor tayori doesn't yet model. Returning the full thread
+      ;; here would silently re-ingest every historical message on every
+      ;; poll; honestly empty until that cursor exists (same known-gap shape
+      ;; as tayori.channel.whatsapp — a real deployment ingests via Gmail's
+      ;; push/watch notification, not by polling this port).
+      [])
     (send-reply! [_ thread body]
       (when-not raw-fn
         (throw (ex-info "email-channel: :raw-fn (thread body -> base64url RFC2822) is required to send"

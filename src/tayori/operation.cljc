@@ -61,24 +61,34 @@
     :document/publish {:kind :revision :id subj :value {:status :published}}))
 
 (defn- commit-effects!
-  "Apply the op-specific EXTERNAL effect on commit. `:document/revise` writes
-  a real branch+commit (a PR candidate — documents get a literal PR from the
-  draft step) and records the returned :branch back onto the revision so
-  `:document/publish` knows what to merge; `:reply/send`/`:document/publish`
-  perform the actual send/publish. `:reply/draft` has no external effect — an
-  email/Slack/WhatsApp draft is pure data until sent."
-  [channel docport store {:keys [op thread document target]}]
+  "Perform the op-specific EXTERNAL effect BEFORE anything is written to the
+  store — if the Channel/DocTarget call throws (network error, GitHub
+  conflict, …), no store mutation and no :committed ledger fact happen, so
+  the store never durably claims a send/publish that didn't actually occur.
+
+  `:document/revise` reads its diff from `record` (the commit about to be
+  written), NOT from the store — the store doesn't have it yet at this point.
+  `:reply/send`/`:document/publish` read the draft/revision to send/publish
+  from the store, which is safe: that content was already committed in an
+  EARLIER run (`:reply/draft`/`:document/revise`), not this one.
+
+  Returns a map of extra store facts to merge in on success (currently just
+  `:document/revise`'s returned :branch, so `:document/publish` later knows
+  what to merge), or nil."
+  [channel docport store {:keys [op thread document target]} record]
   (case op
     :document/revise
-    (let [doc (store/document store document) r (store/revision-of store document)
-          {:keys [branch]} (docport/propose-revision! docport doc (:diff r))]
-      (store/record-datom! store {:kind :revision :id document :value {:branch branch}}))
+    (let [doc (store/document store document)
+          {:keys [branch]} (docport/propose-revision! docport doc (get-in record [:value :diff]))]
+      {:kind :revision :id document :value {:branch branch}})
     :reply/send
     (let [th (store/thread store thread) d (store/draft-of store thread)]
-      (channel/send-reply! channel th (:text d)))
+      (channel/send-reply! channel th (:text d))
+      nil)
     :document/publish
     (let [doc (store/document store document) r (store/revision-of store document)]
-      (docport/publish! docport doc target r))
+      (docport/publish! docport doc target r)
+      nil)
     nil))
 
 (defn build
@@ -157,15 +167,17 @@
                :audit [{:t :signoff-rejected :op (:op request) :subject subj
                         :disposition :hold :basis [:human-rejected]}]}))))
 
-      ;; commit the record + op-specific EXTERNAL effect + ledger.
+      ;; op-specific EXTERNAL effect FIRST, then the record + ledger — a
+      ;; thrown effect leaves no trace of a send/publish that never happened.
       (g/add-node :commit
         (fn [{:keys [request record]}]
-          (store/record-datom! store record)
-          (commit-effects! channel docport store request)
-          (let [f {:t :committed :op (:op request) :subject (subject request)
-                   :disposition :commit :basis (get-in record [:value :status] :proposed)}]
-            (store/append-ledger! store f)
-            {:audit [f]})))
+          (let [extra (commit-effects! channel docport store request record)]
+            (store/record-datom! store record)
+            (when extra (store/record-datom! store extra))
+            (let [f {:t :committed :op (:op request) :subject (subject request)
+                     :disposition :commit :basis (get-in record [:value :status] :proposed)}]
+              (store/append-ledger! store f)
+              {:audit [f]}))))
 
       (g/add-node :hold
         (fn [{:keys [audit]}]
