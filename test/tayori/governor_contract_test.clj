@@ -37,6 +37,21 @@
       (is (= :commit (get-in res [:state :disposition])))
       (is (= "proposed" (name (:status (store/draft-of s "t-status"))))))))
 
+(deftest missing-phase-context-does-not-grant-max-autonomy
+  ;; default-phase is the fallback both when :phase is entirely absent
+  ;; from context (tayori.operation) and when an unrecognized phase
+  ;; number is passed (phase/gate). It used to be 3 -- where
+  ;; :reply/draft can auto-commit -- so a caller that simply forgot to
+  ;; set :phase silently got MAXIMUM autonomy instead of the safe
+  ;; "start narrow" default.
+  (testing "omitting :phase from context still requires human approval on a clean draft"
+    (let [[s actor] (fresh)
+          res (g/run* actor {:request {:op :reply/draft :thread "t-status"} :context {}}
+                      {:thread-id "mp"})]
+      (is (not= :commit (get-in res [:state :disposition]))
+          "a clean draft must not auto-commit when :phase is unset")
+      (is (nil? (store/draft-of s "t-status")) "SSoT untouched without explicit phase"))))
+
 (deftest sending-always-requires-human-signoff
   (testing "even a clean draft never auto-sends — it interrupts for a human"
     (let [[s actor sent] (fresh)
