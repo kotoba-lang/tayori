@@ -8,7 +8,7 @@
   contract as kekkai/gijiroku's ports. `mock-channel` is the default — a
   deterministic in-memory channel so the actor is runnable and testable with
   no network/creds."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (defprotocol Channel
   (fetch-thread [ch thread-id] "the thread's latest known state, or nil")
