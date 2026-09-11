@@ -10,7 +10,7 @@
     publish d-memo   always high-stakes → human sign-off → docport/publish!
     phase 0          draft in ingest-only phase → held (phase-disabled)
 
-  Run: clojure -M:dev:run"
+  Run: kbb -M:dev:run"
   (:require [langgraph.graph :as g]
             [tayori.store :as store]
             [tayori.channel :as channel]

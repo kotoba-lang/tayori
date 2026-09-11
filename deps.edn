@@ -21,7 +21,7 @@
  {;; offline workspace dev — pin transitive langchain to local checkout
   :dev {:override-deps
         {io.github.kotoba-lang/langchain {:local/root "../langchain"}}}
-  ;; clojure -M:dev:run  → drive email/document correspondence through one CorrespondenceActor
+  ;; kbb -M:dev:run  → drive email/document correspondence through one CorrespondenceActor
   :run {:main-opts ["-m" "tayori.sim"]}
   :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner

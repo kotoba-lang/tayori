@@ -58,9 +58,9 @@ human.
 ## Run
 
 ```bash
-clojure -M:dev:run     # drive: draft → send / revise → publish through the actor
-clojure -M:dev:test    # the propose-only contract + store parity + CACAO crypto
-clojure -M:lint        # clj-kondo (errors fail)
+kbb -M:dev:run     # drive: draft → send / revise → publish through the actor
+kbb -M:dev:test    # the propose-only contract + store parity + CACAO crypto
+kbb -M:lint        # clj-kondo (errors fail)
 ```
 
 Demo: register a contact/thread/message (observe → facts) → draft a reply to
