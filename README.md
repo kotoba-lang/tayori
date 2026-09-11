@@ -76,20 +76,20 @@ identical results.
 
 | File | Role |
 |---|---|
-| `src/tayori/store.cljc` | **Store** protocol — `MemStore` ‖ `DatomicStore` (`langchain.db`, swappable to Datomic Local / kotoba-server) + append-only **correspondence audit ledger** |
-| `src/tayori/policy.cljc` | pure checks (redaction requirement · consent-blocked · target-mismatch) — shared by governor & reply-LLM, no I/O |
-| `src/tayori/replyllm.cljc` | **reply-LLM Advisor** — `mock-advisor` ‖ `llm-advisor` (`langchain.model`); draft/revise/send/publish proposals |
-| `src/tayori/governor.cljc` | **ComplianceGovernor** — no-actuation · redaction-required · consent-required · tenant-isolation · high-stakes |
-| `src/tayori/phase.cljc` | **Phase 0→3** — ingest-only → assisted → assisted-draft → supervised (send/publish always human) |
-| `src/tayori/operation.cljc` | **CorrespondenceActor** — langgraph StateGraph; ingest vs assess flows |
-| `src/tayori/channel.cljc` | **Channel** port (`fetch-thread`/`list-new-messages`/`send-reply!`) + `mock-channel` |
+| `src/tayori/store.cljk` | **Store** protocol — `MemStore` ‖ `DatomicStore` (`langchain.db`, swappable to Datomic Local / kotoba-server) + append-only **correspondence audit ledger** |
+| `src/tayori/policy.cljk` | pure checks (redaction requirement · consent-blocked · target-mismatch) — shared by governor & reply-LLM, no I/O |
+| `src/tayori/replyllm.cljk` | **reply-LLM Advisor** — `mock-advisor` ‖ `llm-advisor` (`langchain.model`); draft/revise/send/publish proposals |
+| `src/tayori/governor.cljk` | **ComplianceGovernor** — no-actuation · redaction-required · consent-required · tenant-isolation · high-stakes |
+| `src/tayori/phase.cljk` | **Phase 0→3** — ingest-only → assisted → assisted-draft → supervised (send/publish always human) |
+| `src/tayori/operation.cljk` | **CorrespondenceActor** — langgraph StateGraph; ingest vs assess flows |
+| `src/tayori/channel.cljk` | **Channel** port (`fetch-thread`/`list-new-messages`/`send-reply!`) + `mock-channel` |
 | `src/tayori/channel/{email,slack,whatsapp}.cljc` | real Channel implementations (Gmail API / Slack Web API / WhatsApp Business Cloud API); I/O injected, live untested |
-| `src/tayori/docport.cljc` | **DocTarget** port (`fetch-doc`/`propose-revision!`/`publish!`) + `mock-doctarget` |
-| `src/tayori/docport/git.cljc` | real DocTarget — GitHub API, a literal branch+commit+merge PR |
-| `src/tayori/cacao.clj` | agent-side **CACAO self-mint** (JVM Ed25519 + did:key + CBOR; per-actor key) |
-| `src/tayori/kotoba.clj` | wire `DatomicStore` to a kotoba-server pod (kotobase.net XRPC) |
-| `src/tayori/query.cljc` | pure status lookups (`draft-status`/`sent?`/`revision-status`/`published?`) for callers that don't want to run the actor |
-| `src/tayori/sim.cljc` | demo driver |
+| `src/tayori/docport.cljk` | **DocTarget** port (`fetch-doc`/`propose-revision!`/`publish!`) + `mock-doctarget` |
+| `src/tayori/docport/git.cljk` | real DocTarget — GitHub API, a literal branch+commit+merge PR |
+| `src/tayori/cacao.cljk` | agent-side **CACAO self-mint** (JVM Ed25519 + did:key + CBOR; per-actor key) |
+| `src/tayori/kotoba.cljk` | wire `DatomicStore` to a kotoba-server pod (kotobase.net XRPC) |
+| `src/tayori/query.cljk` | pure status lookups (`draft-status`/`sent?`/`revision-status`/`published?`) for callers that don't want to run the actor |
+| `src/tayori/sim.cljk` | demo driver |
 | `test/tayori/*_test.clj` | propose-only contract · store parity (Mem≡Datomic) · CACAO — **28 tests / 99 assertions** |
 
 ## Channel / DocTarget → real backend (injection)
