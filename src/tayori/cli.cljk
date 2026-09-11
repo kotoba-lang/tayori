@@ -4,7 +4,7 @@
   process boundary consumer that needs one thread's draft status without an
   in-process require across runtimes.
 
-  Usage: `clojure -M -m tayori.cli <ledger.edn> <thread-id>` — prints the
+  Usage: `kbb -M -m tayori.cli <ledger.edn> <thread-id>` — prints the
   draft status (\"proposed\"/\"sent\"/\"none\") and exits 0 on \"sent\", 1
   otherwise (so callers can also just check the exit code).
 
