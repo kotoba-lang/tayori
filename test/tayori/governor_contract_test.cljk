@@ -4,7 +4,7 @@
   Invariant: the actor never sends a message or publishes a document the
   ComplianceGovernor would reject; drafting/revising never auto-actuates;
   sending/publishing always routes to a human regardless of phase."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [tayori.store :as store]
             [tayori.channel :as channel]
