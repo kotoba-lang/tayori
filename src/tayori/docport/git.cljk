@@ -5,7 +5,7 @@
   branch (read off the store's :revision record, which `tayori.operation`
   merges the returned `:branch` back into after `propose-revision!`).
   Mirrors this superproject's own 'GitHub API single-entry commit' pattern for
-  advancing `manifest/west.yml` pins (CLAUDE.md: west.yml 変更は GitHub API の
+  advancing `manifest/west.yml` pins (AGENTS.md: west.yml 変更は GitHub API の
   サーバ側 single-entry commit を唯一の正経路にする) — no local shallow-clone
   merge to fight, no conflict markers.
 
